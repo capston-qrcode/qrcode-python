@@ -56,6 +56,24 @@ def get_char_count_indicator_length(version, mode):
     return None
 
 
+def add_terminator_and_pad(encoded_data, total_bits):
+    terminator = '0000'
+    if len(encoded_data) + 4 <= total_bits:
+        encoded_data += terminator
+    else:
+        encoded_data += '0' * (total_bits - len(encoded_data))
+
+    while len(encoded_data) % 8 != 0:
+        encoded_data += '0'
+
+    padding_patterns = ['11101100', '00010001']
+    i = 0
+    while len(encoded_data) < total_bits:
+        encoded_data += padding_patterns[i % 2]
+        i += 1
+
+    return encoded_data[:total_bits]
+
 def encode_data(data, ecc_level='M'):
     mode = determine_mode(data)
 
@@ -99,7 +117,9 @@ def encode_data(data, ecc_level='M'):
             for byte in char.encode('utf-8'):
                 encoded_data += format(byte, '08b')
 
-    return version, encoded_data
+    encoded_data = add_terminator_and_pad(encoded_data, qr_capacity[ecc_level][version - 1])
+
+    return version, encoded_data, len(encoded_data)
 
 if __name__ == '__main__':
     qr_capacity = {
