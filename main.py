@@ -382,4 +382,14 @@ if __name__ == '__main__':
         print('ecc level:', ecc_level)
         print('인코딩 데이터:', encoded_data)
         print('인코딩 데이터 길이:', len(encoded_data))
+
+        error_block = []
+        error_block_size = error_block_info[ecc_level][version - 1]
+        print('error block size info:', error_block_size)
+        for i in range(0, len(error_block_size), 4):
+            block_count, total_count, data_count, error_count = error_block_size[i:i + 4]
+            for idx in range(block_count):
+                error_block.append((total_count, data_count, error_count))
+        print(error_block)
+
         print()
