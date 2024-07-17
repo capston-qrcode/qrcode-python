@@ -10,22 +10,6 @@ def determine_mode(data):
         return 'Byte'
 
 def get_version(data_length, mode, ecc_level):
-    qr_capacity = {
-        'L': [],
-        'M': [],
-        'Q': [],
-        'H': []
-    }
-    with open('size.csv', mode='r') as file:
-        reader = csv.reader(file)
-        attrs = []
-        for row in reader:
-            if len(attrs) < 1:
-                attrs = row
-                continue
-            for key, value in zip(attrs, row):
-                qr_capacity[key].append(int(value))
-
     for version, capacity in enumerate(qr_capacity[ecc_level], start=1):
         if mode == 'Numeric':
             b_length = 4 + get_char_count_indicator_length(version, mode) + 10 * (data_length // 3)
@@ -118,7 +102,24 @@ def encode_data(data, ecc_level='M'):
     return version, encoded_data
 
 if __name__ == '__main__':
+    qr_capacity = {
+        'L': [],
+        'M': [],
+        'Q': [],
+        'H': []
+    }
+    with open('size.csv', mode='r') as file:
+        reader = csv.reader(file)
+        attrs = []
+        for row in reader:
+            if len(attrs) < 1:
+                attrs = row
+                continue
+            for key, value in zip(attrs, row):
+                qr_capacity[key].append(int(value))
+
     print(encode_data('안녕하세요.'))
+    print(encode_data('https://qrfy.com/?utm_source=Google&utm_medium=CPC&utm_campaign=17680026409&utm_term=qr%20code%20maker&gad_source=1&gclid=Cj0KCQjwkdO0BhDxARIsANkNcrfErfu3V0ztbOAN2_YjxlhdNhLMmjzDfHouAZIx5kZNfoDHi9wHCYoaAmDlEALw_wcB'))
     print(encode_data('010-0000-0000'))
     print(encode_data('AC-42', ecc_level='H'))
     print(encode_data('01234567', ecc_level='H'))
