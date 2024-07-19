@@ -1,5 +1,6 @@
 import re
 import csv
+from PIL import Image
 
 def determine_mode(data):
     if re.match(r'^[0-9]+$', data):
@@ -263,9 +264,21 @@ def make_qrcode(data, ecc_level, version):
     add_align_pattern(modules, version)
     add_timing_pattern(modules, module_count)
 
-    print(modules)
-    for m in modules:
-        print(''.join([str(i) for i in m]))
+    width, height = 4 * module_count, 4 * module_count
+    image = Image.new('1', (32 + width, 32 + height))
+    pixels = image.load()
+
+    for i in range(32 + width):
+        for j in range(32 + height):
+            pixels[i, j] = 1
+
+    for i in range(module_count):
+        for j in range(module_count):
+            if modules[i][j] == 1:
+                for p_i in range(i * 4 + 16, i * 4 + 20):
+                    for p_j in range(j * 4 + 16, j * 4 + 20):
+                        pixels[p_i, p_j] = 0
+    return image
 
 
 if __name__ == '__main__':
@@ -509,7 +522,8 @@ if __name__ == '__main__':
         ('01234567890123450123456789012345', 'H')
     ]
 
-    for data, ecc_level in test_data:
+    for data_idx, d in enumerate(test_data):
+        data, ecc_level = d
         version, encoded_data = encode_data(data, ecc_level)
         print('원본 데이터:', data)
         print('버전:', version)
@@ -526,6 +540,8 @@ if __name__ == '__main__':
                 error_blocks.append((total_count, data_count, error_count))
 
         merged_data = make_data_with_reed_solomon(encoded_data, error_blocks)
-        make_qrcode(merged_data, ecc_level, version)
+        qr_image = make_qrcode(merged_data, ecc_level, version)
+        qr_image.save(f'./image/{data_idx}_qr.png')
+        qr_image.show()
 
         print()
