@@ -383,13 +383,19 @@ if __name__ == '__main__':
         print('인코딩 데이터:', encoded_data)
         print('인코딩 데이터 길이:', len(encoded_data))
 
-        error_block = []
+        error_blocks = []
         error_block_size = error_block_info[ecc_level][version - 1]
         print('error block size info:', error_block_size)
         for i in range(0, len(error_block_size), 4):
             block_count, total_count, data_count, error_count = error_block_size[i:i + 4]
             for idx in range(block_count):
-                error_block.append((total_count, data_count, error_count))
-        print(error_block)
+                error_blocks.append((total_count, data_count, error_count))
 
+        data_idx = 0
+        for error_block in error_blocks:
+            total_count, data_count, error_count = error_block
+            target_data = []
+            for idx in range(data_count):
+                target_data.append(encoded_data[data_idx:data_idx + 8])
+                data_idx += 8
         print()
