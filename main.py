@@ -217,6 +217,55 @@ def make_data_with_reed_solomon(encoded_data, error_blocks):
     print('추가 블록 개수:', additional_blocks)
     print('총 블록 개수:', len(data_block))
 
+    return data_block
+
+
+def add_finder_pattern(modules, start_x, start_y):
+    for i in range(start_y, start_y + 7):
+        for j in range(start_x, start_x + 7):
+            if i == start_y or i == start_y + 6:
+                modules[i][j] = 1
+            elif j == start_x or j == start_x + 6:
+                modules[i][j] = 1
+    for i in range(start_y + 2, start_y + 5):
+        for j in range(start_x + 2, start_x + 5):
+            modules[i][j] = 1
+
+def add_align_pattern(modules, version):
+    pos = align_pattern_pos[version - 1]
+    for i in range(len(pos)):
+        row = pos[i]
+        for j in range(len(pos)):
+            col = pos[j]
+            if modules[row][col] != 2:
+                continue
+            for r in range(-2, 3):
+                for c in range(-2, 3):
+                    if r == -2 or r == 2 or c == -2 or c == 2 or (r == 0 and c == 0):
+                        modules[row + r][col + c] = 1
+                    else:
+                        modules[row + r][col + c] = 0
+
+def add_timing_pattern(modules, module_count):
+    for i in range(8, module_count - 8):
+        if modules[i][6] != 2: continue
+        modules[i][6] = int(i % 2 == 0)
+    for i in range(8, module_count - 8):
+        if modules[6][i] != 2: continue
+        modules[6][i] = int(i % 2 == 0)
+
+def make_qrcode(data, ecc_level, version):
+    module_count = version * 4 + 17
+    modules = [[2] * module_count for _ in range(module_count)]
+    add_finder_pattern(modules, 0, 0)
+    add_finder_pattern(modules, module_count - 7, 0)
+    add_finder_pattern(modules, 0, module_count - 7)
+    add_align_pattern(modules, version)
+    add_timing_pattern(modules, module_count)
+
+    print(modules)
+    for m in modules:
+        print(''.join([str(i) for i in m]))
 
 
 if __name__ == '__main__':
@@ -407,15 +456,57 @@ if __name__ == '__main__':
         ]
     }
 
+    align_pattern_pos = [
+        [],
+        [6, 18],
+        [6, 22],
+        [6, 26],
+        [6, 30],
+        [6, 34],
+        [6, 22, 38],
+        [6, 24, 42],
+        [6, 26, 46],
+        [6, 28, 50],
+        [6, 30, 54],
+        [6, 32, 58],
+        [6, 34, 62],
+        [6, 26, 46, 66],
+        [6, 26, 48, 70],
+        [6, 26, 50, 74],
+        [6, 30, 54, 78],
+        [6, 30, 56, 82],
+        [6, 30, 58, 86],
+        [6, 34, 62, 90],
+        [6, 28, 50, 72, 94],
+        [6, 26, 50, 74, 98],
+        [6, 30, 54, 78, 102],
+        [6, 28, 54, 80, 106],
+        [6, 32, 58, 84, 110],
+        [6, 30, 58, 86, 114],
+        [6, 34, 62, 90, 118],
+        [6, 26, 50, 74, 98, 122],
+        [6, 30, 54, 78, 102, 126],
+        [6, 26, 52, 78, 104, 130],
+        [6, 30, 56, 82, 108, 134],
+        [6, 34, 60, 86, 112, 138],
+        [6, 30, 58, 86, 114, 142],
+        [6, 34, 62, 90, 118, 146],
+        [6, 30, 54, 78, 102, 126, 150],
+        [6, 24, 50, 76, 102, 128, 154],
+        [6, 28, 54, 80, 106, 132, 158],
+        [6, 32, 58, 84, 110, 136, 162],
+        [6, 26, 54, 82, 110, 138, 166],
+        [6, 30, 58, 86, 114, 142, 170],
+    ]
+
     exp, log = init_galois_field()
 
     test_data = [
-        ('안녕하세요.', 'M'),
+        ('안녕하세요.dsjlkl_ndjks7&&83', 'M'),
         ('https://qrfy.com/?utm_source=Google&utm_medium=CPC&utm_campaign=17680026409&utm_term=qr%20code%20maker&gad_source=1&gclid=Cj0KCQjwkdO0BhDxARIsANkNcrfErfu3V0ztbOAN2_YjxlhdNhLMmjzDfHouAZIx5kZNfoDHi9wHCYoaAmDlEALw_wcB', 'M'),
         ('010-0000-0000', 'M'),
         ('AC-42', 'H'),
-        ('01234567', 'H'),
-        ('0123456789012345', 'H')
+        ('01234567890123450123456789012345', 'H')
     ]
 
     for data, ecc_level in test_data:
@@ -434,6 +525,7 @@ if __name__ == '__main__':
             for idx in range(block_count):
                 error_blocks.append((total_count, data_count, error_count))
 
-        make_data_with_reed_solomon(encoded_data, error_blocks)
+        merged_data = make_data_with_reed_solomon(encoded_data, error_blocks)
+        make_qrcode(merged_data, ecc_level, version)
 
         print()
