@@ -174,6 +174,49 @@ def rs_encode_msg(msg_in, nsym, exp, log):
     remainder = poly_div(msg_out, gen, exp, log)
     return msg_in + remainder
 
+def make_data_with_reed_solomon(encoded_data, error_blocks):
+    data_idx = 0
+    data_code = []
+    error_code = []
+    max_data_length = 0
+    max_error_data_length = 0
+    additional_blocks = 0
+    for error_block in error_blocks:
+        total_count, data_count, error_count = error_block
+
+        additional_blocks += total_count - (data_count + 2 * error_count)
+
+        max_data_length = max(max_data_length, data_count)
+        max_error_data_length = max(max_error_data_length, error_count * 2)
+
+        target_data = []
+        for idx in range(data_count):
+            data = encoded_data[data_idx:data_idx + 8]
+            target_data.append(data)
+            data_idx += 8
+        rs_data = rs_encode_msg([int(d, 2) for d in target_data], error_count * 2, exp, log)
+        rs_data = rs_data[len(target_data):]
+
+        data_code.append(target_data)
+        error_code.append([format(d, '08b') for d in rs_data])
+
+    data_block = []
+    for i in range(max_data_length):
+        for d in data_code:
+            if i < len(d):
+                data_block.append(d[i])
+    for i in range(max_error_data_length):
+        for d in error_code:
+            if i < len(d):
+                data_block.append(d[i])
+    for _ in range(additional_blocks):
+        data_block.append('00000000')
+
+    print('데이터 블록 개수:', sum([len(d) for d in data_code]))
+    print('에러 블록 개수:', sum([len(d) for d in error_code]))
+    print('추가 블록 개수:', additional_blocks)
+    print('총 블록 개수:', len(data_block))
+
 
 
 if __name__ == '__main__':
@@ -391,11 +434,6 @@ if __name__ == '__main__':
             for idx in range(block_count):
                 error_blocks.append((total_count, data_count, error_count))
 
-        data_idx = 0
-        for error_block in error_blocks:
-            total_count, data_count, error_count = error_block
-            target_data = []
-            for idx in range(data_count):
-                target_data.append(encoded_data[data_idx:data_idx + 8])
-                data_idx += 8
+        make_data_with_reed_solomon(encoded_data, error_blocks)
+
         print()
