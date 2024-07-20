@@ -243,16 +243,13 @@ def gf_poly_div(dividend, divisor):
                 result[i + j] ^= gf_mult(divisor[j], coef)
     return result[-(len(divisor) - 1):]
 
-
-def bch_encode_version(data_int):
+def bch_encode(data_int, n, k, gen_poly):
     data_poly = [int(bit) for bit in bin(data_int)[2:]]
-    data_poly += [0] * 12
+    data_poly += [0] * (n - k)
 
-    gen_poly = [1] + [1] + [1] + [1] + [1] + [0] * 2 + [1] + [0] * 2 + [1] + [0] + [1]
     rem = gf_poly_div(data_poly, gen_poly)
+    return ''.join(str(bit) for bit in rem)
 
-    codeword = list(format(data_int, '06b')) + rem
-    return ''.join(str(bit) for bit in codeword)
 
 def add_finder_pattern(modules, module_count, start_x, start_y):
     for i in range(start_y - 1, start_y + 8):
@@ -302,7 +299,8 @@ def add_timing_pattern(modules, module_count):
         modules[6][i] = int(i % 2 == 0)
 
 def add_version_information(modules, module_count, version):
-    version_bits = bch_encode_version(version)
+    version_bits = format(version, '06b')
+    version_bits += bch_encode(version, 18, 6, [1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 1])
     bits_idx = 0
     for i in range(0, 6):
         for j in range(module_count - 11, module_count - 8):
@@ -313,8 +311,36 @@ def add_version_information(modules, module_count, version):
 def add_data_with_mask(modules, module_count, mask):
     pass
 
-def add_format_information_with_mask(modules, module_count, mask):
-    pass
+def add_format_information_with_mask(modules, module_count, mask_bit, error_bit):
+    format_bit = error_bit + mask_bit
+    format_bit += bch_encode(int(format_bit, 2), 15, 5, [1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1])
+    format_bit = [int(b) for b in format_bit]
+    mask = [1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0]
+    for i in range(15):
+        format_bit[i] = format_bit[i] ^ mask[i]
+    # print('format bits:', ''.join([str(i) for i in format_bit]))
+
+    bit_idx = 0
+    for i in range(0, 9):
+        if i == 6: continue
+        modules[i][8] = format_bit[bit_idx]
+        bit_idx += 1
+    for i in range(7, -1, -1):
+        if i == 6: continue
+        modules[8][i] = format_bit[bit_idx]
+        bit_idx += 1
+
+    bit_idx = 0
+    for i in range(module_count - 1, module_count - 9, -1):
+        modules[8][i] = format_bit[bit_idx]
+        bit_idx += 1
+    for i in range(module_count - 8, module_count):
+        if i == module_count - 8:
+            modules[i][8] = 1
+            continue
+        modules[i][8] = format_bit[bit_idx]
+        bit_idx += 1
+    return modules
 
 def evaluate_mask(modules, module_count):
     pass
@@ -331,8 +357,14 @@ def make_qrcode(data, ecc_level, version):
     if version >= 7:
         add_version_information(modules, module_count, version)
 
-    for m in modules:
-        print(m)
+    for mask_bit in mask_bits:
+        mask_f = mask_func[mask_bit]
+        option = add_format_information_with_mask([arr[:] for arr in modules], module_count, mask_bit, error_level_to_bit[ecc_level])
+        # option = add_data_with_mask(option, module_count, mask_f)
+
+        # for m in option:
+        #     print(m)
+        # print()
 
     width, height = 4 * module_count, 4 * module_count
     image = Image.new('1', (32 + width, 32 + height))
@@ -592,6 +624,13 @@ if __name__ == '__main__':
         '101': lambda i, j: (i * j) % 2 + (i * j) % 3 == 0,
         '110': lambda i, j: ((i * j) % 2 + (i * j) % 3) % 2 == 0,
         '111': lambda i, j: ((i * j) % 3 + (i + j) % 2) % 2 == 0,
+    }
+
+    error_level_to_bit = {
+        'L': '01',
+        'M': '00',
+        'Q': '11',
+        'H': '10'
     }
 
     exp, log = init_galois_field()
