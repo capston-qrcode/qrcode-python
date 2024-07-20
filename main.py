@@ -221,6 +221,38 @@ def make_data_with_reed_solomon(encoded_data, error_blocks):
     return data_block
 
 
+def gf_mult(x, y, prim=0b1011, field_charac_full=1 << 4):
+    r = 0
+    while y:
+        if y & 1:
+            r ^= x
+        x <<= 1
+        if x & field_charac_full:
+            x ^= prim
+        y >>= 1
+    return r
+
+
+def gf_poly_div(dividend, divisor):
+    result = list(dividend)
+    for i in range(len(dividend) - len(divisor) + 1):
+        coef = result[i]
+        if coef != 0:
+            for j in range(1, len(divisor)):
+                result[i + j] ^= gf_mult(divisor[j], coef)
+    return result[-(len(divisor) - 1):]
+
+
+def bch_encode_version(data_int):
+    data_poly = [int(bit) for bit in bin(data_int)[2:]]
+    data_poly += [0] * 12
+
+    gen_poly = [1] + [1] + [1] + [1] + [1] + [0] * 2 + [1] + [0] * 2 + [1] + [0] + [1]
+    rem = gf_poly_div(data_poly, gen_poly)
+
+    codeword = list(format(data_int, '06b')) + rem
+    return ''.join(str(bit) for bit in codeword)
+
 def add_finder_pattern(modules, module_count, start_x, start_y):
     for i in range(start_y - 1, start_y + 8):
         for j in range(start_x - 1, start_x + 8):
@@ -268,6 +300,15 @@ def add_timing_pattern(modules, module_count):
         if modules[6][i] != 2: continue
         modules[6][i] = int(i % 2 == 0)
 
+def add_version_information(modules, module_count, version):
+    version_bits = bch_encode_version(version)
+    bits_idx = 0
+    for i in range(0, 6):
+        for j in range(module_count - 11, module_count - 8):
+            modules[j][i] = int(version_bits[bits_idx])
+            modules[i][j] = int(version_bits[bits_idx])
+            bits_idx += 1
+
 def make_qrcode(data, ecc_level, version):
     module_count = version * 4 + 17
     modules = [[2] * module_count for _ in range(module_count)]
@@ -276,6 +317,9 @@ def make_qrcode(data, ecc_level, version):
     add_finder_pattern(modules, module_count, 0, module_count - 7)
     add_align_pattern(modules, version)
     add_timing_pattern(modules, module_count)
+
+    if version >= 7:
+        add_version_information(modules, module_count, version)
 
     for m in modules:
         print(m)
@@ -528,20 +572,14 @@ if __name__ == '__main__':
         [6, 30, 58, 86, 114, 142, 170],
     ]
 
-    version_encoded = [
-        '000111110010010100',
-        '001000010110111100',
-        '001001101010011001',
-    ]
-
     exp, log = init_galois_field()
 
     test_data = [
-        ('안녕하세요.dsjlkl_ndjks7&&83', 'M'),
+        # ('안녕하세요.dsjlkl_ndjks7&&83', 'M'),
         ('https://qrfy.com/?utm_source=Google&utm_medium=CPC&utm_campaign=17680026409&utm_term=qr%20code%20maker&gad_source=1&gclid=Cj0KCQjwkdO0BhDxARIsANkNcrfErfu3V0ztbOAN2_YjxlhdNhLMmjzDfHouAZIx5kZNfoDHi9wHCYoaAmDlEALw_wcB', 'M'),
-        ('010-0000-0000', 'M'),
-        ('AC-42', 'H'),
-        ('01234567890123450123456789012345', 'H')
+        # ('010-0000-0000', 'M'),
+        # ('AC-42', 'H'),
+        # ('01234567890123450123456789012345', 'H')
     ]
 
     for data_idx, d in enumerate(test_data):
@@ -564,6 +602,6 @@ if __name__ == '__main__':
         merged_data = make_data_with_reed_solomon(encoded_data, error_blocks)
         qr_image = make_qrcode(merged_data, ecc_level, version)
         qr_image.save(f'./image/{data_idx}_qr.png')
-        qr_image.show()
+        # qr_image.show()
 
         print()
