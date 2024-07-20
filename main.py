@@ -1,5 +1,6 @@
 import re
 import csv
+import math
 from PIL import Image
 
 def determine_mode(data):
@@ -309,6 +310,15 @@ def add_version_information(modules, module_count, version):
             modules[i][j] = int(version_bits[bits_idx])
             bits_idx += 1
 
+def add_data_with_mask(modules, module_count, mask):
+    pass
+
+def add_format_information_with_mask(modules, module_count, mask):
+    pass
+
+def evaluate_mask(modules, module_count):
+    pass
+
 def make_qrcode(data, ecc_level, version):
     module_count = version * 4 + 17
     modules = [[2] * module_count for _ in range(module_count)]
@@ -571,6 +581,18 @@ if __name__ == '__main__':
         [6, 26, 54, 82, 110, 138, 166],
         [6, 30, 58, 86, 114, 142, 170],
     ]
+
+    mask_bits = ['000', '001', '010', '011', '100', '101', '110', '111']
+    mask_func = {
+        '000': lambda i, j: (i + j) % 2 == 0,
+        '001': lambda i, j: i % 2 == 0,
+        '010': lambda i, j: j % 3 == 0,
+        '011': lambda i, j: (i + j) % 3 == 0,
+        '100': lambda i, j: (math.floor(i / 2) + math.floor(j / 3)) % 2 == 0,
+        '101': lambda i, j: (i * j) % 2 + (i * j) % 3 == 0,
+        '110': lambda i, j: ((i * j) % 2 + (i * j) % 3) % 2 == 0,
+        '111': lambda i, j: ((i * j) % 3 + (i + j) % 2) % 2 == 0,
+    }
 
     exp, log = init_galois_field()
 
