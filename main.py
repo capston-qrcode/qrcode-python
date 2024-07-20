@@ -308,8 +308,33 @@ def add_version_information(modules, module_count, version):
             modules[i][j] = int(version_bits[bits_idx])
             bits_idx += 1
 
-def add_data_with_mask(modules, module_count, mask):
-    pass
+def add_data_with_mask(modules, module_count, mask_func, data):
+    direction_y = -1
+    x = module_count - 1
+    y = module_count - 1
+    for block in data:
+        bit_idx = 7
+        while bit_idx >= 0:
+            if modules[y][x] == 2:
+                target_bit = int(block[bit_idx])
+                if mask_func(x, y):
+                    target_bit ^= 1
+                modules[y][x] = target_bit
+                bit_idx -= 1
+            if x % 2 == 0:
+                x -= 1
+            else:
+                x += 1
+                y += direction_y
+                if y < 0:
+                    direction_y = 1
+                    y = 0
+                    x -= 2
+                elif y >= module_count:
+                    direction_y = -1
+                    y = module_count - 1
+                    x -= 2
+    return modules
 
 def add_format_information_with_mask(modules, module_count, mask_bit, error_bit):
     format_bit = error_bit + mask_bit
@@ -343,7 +368,62 @@ def add_format_information_with_mask(modules, module_count, mask_bit, error_bit)
     return modules
 
 def evaluate_mask(modules, module_count):
-    pass
+    penalty = 0
+
+    # Rule 1: 연속된 같은 색 모듈 검출
+    for i in range(module_count):
+        row_count = 1
+        col_count = 1
+        for j in range(1, module_count):
+            # 행 방향으로 연속된 모듈
+            if modules[i][j] == modules[i][j - 1]:
+                row_count += 1
+            else:
+                if row_count >= 5:
+                    penalty += (row_count - 2)
+                row_count = 1
+            # 열 방향으로 연속된 모듈
+            if modules[j][i] == modules[j - 1][i]:
+                col_count += 1
+            else:
+                if col_count >= 5:
+                    penalty += (col_count - 2)
+                col_count = 1
+        if row_count >= 5:
+            penalty += (row_count - 2)
+        if col_count >= 5:
+            penalty += (col_count - 2)
+
+    # Rule 2: 2x2 블록 패턴 검출
+    for i in range(module_count - 1):
+        for j in range(module_count - 1):
+            if modules[i][j] == modules[i][j + 1] == modules[i + 1][j] == modules[i + 1][j + 1]:
+                penalty += 3
+
+    # Rule 3: 1:1:3:1:1 패턴 검출
+    def check_pattern(arr):
+        return (arr[0] == arr[1] and
+                arr[1] != arr[2] and
+                arr[2] == arr[3] == arr[4] and
+                arr[4] != arr[5] and
+                arr[5] == arr[6])
+
+    for i in range(module_count):
+        for j in range(module_count - 6):
+            row_pattern = modules[i][j:j + 7]
+            col_pattern = [modules[j + k][i] for k in range(7)]
+            if check_pattern(row_pattern):
+                penalty += 40
+            if check_pattern(col_pattern):
+                penalty += 40
+
+    # Rule 4: 전체 모듈의 흑백 비율
+    total_modules = module_count * module_count
+    dark_modules = sum(row.count(1) for row in modules)
+    k = abs(dark_modules * 2 - total_modules) // total_modules
+    penalty += k * 10
+
+    return penalty
 
 def make_qrcode(data, ecc_level, version):
     module_count = version * 4 + 17
@@ -357,14 +437,17 @@ def make_qrcode(data, ecc_level, version):
     if version >= 7:
         add_version_information(modules, module_count, version)
 
+
+    min_penalty = 1e10
+    min_module = []
     for mask_bit in mask_bits:
         mask_f = mask_func[mask_bit]
         option = add_format_information_with_mask([arr[:] for arr in modules], module_count, mask_bit, error_level_to_bit[ecc_level])
-        # option = add_data_with_mask(option, module_count, mask_f)
-
-        # for m in option:
-        #     print(m)
-        # print()
+        option = add_data_with_mask(option, module_count, mask_f, data)
+        penalty = evaluate_mask(option, module_count)
+        if penalty < min_penalty:
+            min_penalty = penalty
+            min_module = option
 
     width, height = 4 * module_count, 4 * module_count
     image = Image.new('1', (32 + width, 32 + height))
@@ -376,7 +459,7 @@ def make_qrcode(data, ecc_level, version):
 
     for i in range(module_count):
         for j in range(module_count):
-            if modules[i][j] == 1:
+            if min_module[i][j] == 1:
                 for p_i in range(i * 4 + 16, i * 4 + 20):
                     for p_j in range(j * 4 + 16, j * 4 + 20):
                         pixels[p_i, p_j] = 0
