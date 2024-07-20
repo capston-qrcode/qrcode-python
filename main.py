@@ -221,13 +221,26 @@ def make_data_with_reed_solomon(encoded_data, error_blocks):
     return data_block
 
 
-def add_finder_pattern(modules, start_x, start_y):
+def add_finder_pattern(modules, module_count, start_x, start_y):
+    for i in range(start_y - 1, start_y + 8):
+        for j in range(start_x - 1, start_x + 8):
+            if 0 <= i < module_count and 0 <= j < module_count:
+                if i == start_y - 1 or i == start_y + 7:
+                    modules[i][j] = 0
+                elif j == start_x - 1 or j == start_x + 7:
+                    modules[i][j] = 0
     for i in range(start_y, start_y + 7):
         for j in range(start_x, start_x + 7):
             if i == start_y or i == start_y + 6:
                 modules[i][j] = 1
             elif j == start_x or j == start_x + 6:
                 modules[i][j] = 1
+    for i in range(start_y + 1, start_y + 6):
+        for j in range(start_x + 1, start_x + 6):
+            if i == start_y + 1 or i == start_y + 5:
+                modules[i][j] = 0
+            elif j == start_x + 1 or j == start_x + 5:
+                modules[i][j] = 0
     for i in range(start_y + 2, start_y + 5):
         for j in range(start_x + 2, start_x + 5):
             modules[i][j] = 1
@@ -258,11 +271,14 @@ def add_timing_pattern(modules, module_count):
 def make_qrcode(data, ecc_level, version):
     module_count = version * 4 + 17
     modules = [[2] * module_count for _ in range(module_count)]
-    add_finder_pattern(modules, 0, 0)
-    add_finder_pattern(modules, module_count - 7, 0)
-    add_finder_pattern(modules, 0, module_count - 7)
+    add_finder_pattern(modules, module_count, 0, 0)
+    add_finder_pattern(modules, module_count, module_count - 7, 0)
+    add_finder_pattern(modules, module_count, 0, module_count - 7)
     add_align_pattern(modules, version)
     add_timing_pattern(modules, module_count)
+
+    for m in modules:
+        print(m)
 
     width, height = 4 * module_count, 4 * module_count
     image = Image.new('1', (32 + width, 32 + height))
@@ -510,6 +526,12 @@ if __name__ == '__main__':
         [6, 32, 58, 84, 110, 136, 162],
         [6, 26, 54, 82, 110, 138, 166],
         [6, 30, 58, 86, 114, 142, 170],
+    ]
+
+    version_encoded = [
+        '000111110010010100',
+        '001000010110111100',
+        '001001101010011001',
     ]
 
     exp, log = init_galois_field()
