@@ -306,6 +306,7 @@ def add_timing_pattern(modules, module_count):
 def add_version_information(modules, module_count, version):
     version_bits = format(version, '06b')
     version_bits += bch_encode(version, 18, 6, [1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 1])
+    print('버전 비트:', version_bits)
     bits_idx = 0
     for i in range(0, 6):
         for j in range(module_count - 11, module_count - 8):
@@ -382,12 +383,12 @@ def add_format_information_with_mask(modules, module_count, mask_bit, error_bit)
 
     bit_idx = 0
     for i in range(module_count - 1, module_count - 9, -1):
+        if i == module_count - 8:
+            modules[8][i] = 1
+            continue
         modules[8][i] = format_bit[bit_idx]
         bit_idx += 1
     for i in range(module_count - 8, module_count):
-        if i == module_count - 8:
-            modules[i][8] = 1
-            continue
         modules[i][8] = format_bit[bit_idx]
         bit_idx += 1
     return modules
@@ -750,9 +751,9 @@ if __name__ == '__main__':
 
     test_data = [
         # ('안녕하세요.dsjlkl_ndjks7&&83', 'M'),
-        ('https://qrfy.com/?utm_source=Google&utm_medium=CPC&utm_campaign=17680026409&utm_term=qr%20code%20maker&gad_source=1&gclid=Cj0KCQjwkdO0BhDxARIsANkNcrfErfu3V0ztbOAN2_YjxlhdNhLMmjzDfHouAZIx5kZNfoDHi9wHCYoaAmDlEALw_wcB', 'M'),
+        # ('https://qrfy.com/?utm_source=Google&utm_medium=CPC&utm_campaign=17680026409&utm_term=qr%20code%20maker&gad_source=1&gclid=Cj0KCQjwkdO0BhDxARIsANkNcrfErfu3V0ztbOAN2_YjxlhdNhLMmjzDfHouAZIx5kZNfoDHi9wHCYoaAmDlEALw_wcB', 'M'),
         # ('010-0000-0000', 'M'),
-        # ('AC-42', 'H'),
+        ('AC-42', 'H'),
         # ('01234567890123450123456789012345', 'H')
     ]
 
