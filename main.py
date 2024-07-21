@@ -320,6 +320,7 @@ def add_version_information(modules, module_count, version):
             bits_idx += 1
 
 def add_data_with_mask(modules, module_count, mask_func, data):
+    print('map data:', [int(i, 2) for i in data])
     direction_y = -1
     x = module_count - 1
     y = module_count - 1
@@ -334,8 +335,8 @@ def add_data_with_mask(modules, module_count, mask_func, data):
 
     alpha = [55, 80, 105, 130, 155, 180, 205, 230]
     for idx, block in enumerate(data):
-        bit_idx = 7
-        while bit_idx >= 0:
+        bit_idx = 0
+        while bit_idx <= 7:
             if modules[y][x] == 2:
                 for p_i in range(x * 4 + 16, x * 4 + 20):
                     for p_j in range(y * 4 + 16, y * 4 + 20):
@@ -346,7 +347,7 @@ def add_data_with_mask(modules, module_count, mask_func, data):
                     target_bit ^= 1
                 modules[y][x] = target_bit
                 # modules[y][x] = alpha
-                bit_idx -= 1
+                bit_idx += 1
             if (x % 2 == 0) ^ (x <= 6):
                 x -= 1
             else:
@@ -371,31 +372,32 @@ def add_format_information_with_mask(modules, module_count, mask_bit, error_bit)
     format_bit = error_bit + mask_bit
     format_bit += bch_encode(int(format_bit, 2), 15, 5, [1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1])
     format_bit = [int(b) for b in format_bit]
+    print('format bits:', ''.join([str(i) for i in format_bit]))
     mask = [1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0]
     for i in range(15):
         format_bit[i] = format_bit[i] ^ mask[i]
-    print('format bits:', ''.join([str(i) for i in format_bit]))
+    print('masked format bits:', ''.join([str(i) for i in format_bit]))
 
-    bit_idx = 0
+    bit_idx = 14
     for i in range(0, 9):
         if i == 6: continue
         modules[i][8] = format_bit[bit_idx]
-        bit_idx += 1
+        bit_idx -= 1
     for i in range(7, -1, -1):
         if i == 6: continue
         modules[8][i] = format_bit[bit_idx]
-        bit_idx += 1
+        bit_idx -= 1
 
-    bit_idx = 0
+    bit_idx = 14
     for i in range(module_count - 1, module_count - 9, -1):
         if i == module_count - 8:
             modules[8][i] = 1
             continue
         modules[8][i] = format_bit[bit_idx]
-        bit_idx += 1
+        bit_idx -= 1
     for i in range(module_count - 8, module_count):
         modules[i][8] = format_bit[bit_idx]
-        bit_idx += 1
+        bit_idx -= 1
     return modules
 
 def evaluate_mask(modules, module_count):
@@ -483,8 +485,8 @@ def make_qrcode(data, ecc_level, version):
             min_module = option
             min_mask = mask_bit
     print(f'선택된 마스크: {min_mask} 패널티: {min_penalty}')
-    for m in min_module:
-        print(*m)
+    # for m in min_module:
+    #     print(*m)
 
     width, height = 4 * module_count, 4 * module_count
     image = Image.new('1', (32 + width, 32 + height))
@@ -733,7 +735,8 @@ if __name__ == '__main__':
         [6, 30, 58, 86, 114, 142, 170],
     ]
 
-    mask_bits = ['000', '001', '010', '011', '100', '101', '110', '111']
+    # mask_bits = ['000', '001', '010', '011', '100', '101', '110', '111']
+    mask_bits = ['010']
     mask_func = {
         '000': lambda i, j: (i + j) % 2 == 0,
         '001': lambda i, j: i % 2 == 0,
@@ -755,11 +758,11 @@ if __name__ == '__main__':
     exp, log = init_galois_field()
 
     test_data = [
-        # ('안녕하세요.dsjlkl_ndjks7&&83', 'M'),
-        # ('https://qrfy.com/?utm_source=Google&utm_medium=CPC&utm_campaign=17680026409&utm_term=qr%20code%20maker&gad_source=1&gclid=Cj0KCQjwkdO0BhDxARIsANkNcrfErfu3V0ztbOAN2_YjxlhdNhLMmjzDfHouAZIx5kZNfoDHi9wHCYoaAmDlEALw_wcB', 'M'),
-        # ('010-0000-0000', 'M'),
+        ('안녕하세요.dsjlkl_ndjks7&&83', 'M'),
+        ('https://qrfy.com/?utm_source=Google&utm_medium=CPC&utm_campaign=17680026409&utm_term=qr%20code%20maker&gad_source=1&gclid=Cj0KCQjwkdO0BhDxARIsANkNcrfErfu3V0ztbOAN2_YjxlhdNhLMmjzDfHouAZIx5kZNfoDHi9wHCYoaAmDlEALw_wcB', 'M'),
+        ('010-0000-0000', 'M'),
         ('AC-42', 'H'),
-        # ('01234567890123450123456789012345', 'H')
+        ('01234567890123450123456789012345', 'H')
     ]
 
     for data_idx, d in enumerate(test_data):
