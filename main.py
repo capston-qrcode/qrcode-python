@@ -69,6 +69,11 @@ def add_terminator_and_pad(encoded_data, total_bits):
     while len(encoded_data) % 8 != 0:
         encoded_data += '0'
 
+    rest = len(encoded_data) % 8
+    if rest:
+        for _ in range(8 - rest):
+            encoded_data += '0'
+
     padding_patterns = ['11101100', '00010001']
     bytes_to_fill = (total_bits - len(encoded_data)) // 8
     for i in range(bytes_to_fill):
