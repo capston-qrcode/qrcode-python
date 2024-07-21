@@ -3,6 +3,10 @@ import csv
 import math
 from PIL import Image
 
+import copy
+
+from reedsolo import RSCodec
+
 def determine_mode(data):
     if re.match(r'^[0-9]+$', data):
         return 'Numeric'
@@ -59,22 +63,17 @@ def get_char_count_indicator_length(version, mode):
 
 
 def add_terminator_and_pad(encoded_data, total_bits):
-    terminator = '0000'
-    if len(encoded_data) + 4 <= total_bits:
-        encoded_data += terminator
-    else:
-        encoded_data += '0' * (total_bits - len(encoded_data))
+    for _ in range(min(4, total_bits - len(encoded_data))):
+        encoded_data += '0'
 
     while len(encoded_data) % 8 != 0:
         encoded_data += '0'
 
     padding_patterns = ['11101100', '00010001']
-    i = 0
-    while len(encoded_data) < total_bits:
+    bytes_to_fill = (total_bits - len(encoded_data)) // 8
+    for i in range(bytes_to_fill):
         encoded_data += padding_patterns[i % 2]
-        i += 1
-
-    return encoded_data[:total_bits]
+    return encoded_data
 
 def encode_data(data, ecc_level='M'):
     mode = determine_mode(data)
@@ -174,29 +173,35 @@ def rs_encode_msg(msg_in, nsym, exp, log):
     msg_out = [0] * (len(msg_in) + nsym)
     msg_out[:len(msg_in)] = msg_in
     remainder = poly_div(msg_out, gen, exp, log)
+
+    # rsc = RSCodec(nsym)
+    # full_codewords = rsc.encode(msg_in)
+    # print(f'rsc: {list(full_codewords)[-nsym:] == remainder}')
     return msg_in + remainder
 
 def make_data_with_reed_solomon(encoded_data, error_blocks):
     data_idx = 0
     data_code = []
     error_code = []
+
     max_data_length = 0
     max_error_data_length = 0
     additional_blocks = 0
     for error_block in error_blocks:
         total_count, data_count, error_count = error_block
+        error_count = total_count - data_count
 
-        additional_blocks += total_count - (data_count + 2 * error_count)
+        # additional_blocks += total_count - (data_count + 2 * error_count)
 
         max_data_length = max(max_data_length, data_count)
-        max_error_data_length = max(max_error_data_length, error_count * 2)
+        max_error_data_length = max(max_error_data_length, error_count)
 
         target_data = []
         for idx in range(data_count):
             data = encoded_data[data_idx:data_idx + 8]
             target_data.append(data)
             data_idx += 8
-        rs_data = rs_encode_msg([int(d, 2) for d in target_data], error_count * 2, exp, log)
+        rs_data = rs_encode_msg([int(d, 2) for d in target_data], error_count, exp, log)
         rs_data = rs_data[len(target_data):]
 
         data_code.append(target_data)
@@ -312,16 +317,31 @@ def add_data_with_mask(modules, module_count, mask_func, data):
     direction_y = -1
     x = module_count - 1
     y = module_count - 1
-    for block in data:
+
+    width, height = 4 * module_count, 4 * module_count
+    image = Image.new('L', (32 + width, 32 + height))
+    pixels = image.load()
+
+    for i in range(32 + width):
+        for j in range(32 + height):
+            pixels[i, j] = 255
+
+    alpha = [55, 80, 105, 130, 155, 180, 205, 230]
+    for idx, block in enumerate(data):
         bit_idx = 7
         while bit_idx >= 0:
             if modules[y][x] == 2:
+                for p_i in range(x * 4 + 16, x * 4 + 20):
+                    for p_j in range(y * 4 + 16, y * 4 + 20):
+                        pixels[p_i, p_j] = alpha[bit_idx]
+
                 target_bit = int(block[bit_idx])
-                if mask_func(x, y):
+                if mask_func(y, x):
                     target_bit ^= 1
                 modules[y][x] = target_bit
+                # modules[y][x] = alpha
                 bit_idx -= 1
-            if x % 2 == 0:
+            if (x % 2 == 0) ^ (x <= 6):
                 x -= 1
             else:
                 x += 1
@@ -334,6 +354,11 @@ def add_data_with_mask(modules, module_count, mask_func, data):
                     direction_y = -1
                     y = module_count - 1
                     x -= 2
+            if x == 6:
+                x -= 1
+
+        # image.save(f'./image/qr_blocks_{idx}.png')
+    image.save(f'./image/qr_blocks.png')
     return modules
 
 def add_format_information_with_mask(modules, module_count, mask_bit, error_bit):
@@ -343,7 +368,7 @@ def add_format_information_with_mask(modules, module_count, mask_bit, error_bit)
     mask = [1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0]
     for i in range(15):
         format_bit[i] = format_bit[i] ^ mask[i]
-    # print('format bits:', ''.join([str(i) for i in format_bit]))
+    print('format bits:', ''.join([str(i) for i in format_bit]))
 
     bit_idx = 0
     for i in range(0, 9):
@@ -437,17 +462,23 @@ def make_qrcode(data, ecc_level, version):
     if version >= 7:
         add_version_information(modules, module_count, version)
 
-
     min_penalty = 1e10
+    min_mask = 0
     min_module = []
     for mask_bit in mask_bits:
         mask_f = mask_func[mask_bit]
-        option = add_format_information_with_mask([arr[:] for arr in modules], module_count, mask_bit, error_level_to_bit[ecc_level])
+        option = copy.deepcopy(modules)
+        option = add_format_information_with_mask(option, module_count, mask_bit, error_level_to_bit[ecc_level])
         option = add_data_with_mask(option, module_count, mask_f, data)
         penalty = evaluate_mask(option, module_count)
         if penalty < min_penalty:
+            print('low')
             min_penalty = penalty
             min_module = option
+            min_mask = mask_bit
+    print(f'선택된 마스크: {min_mask} 패널티: {min_penalty}')
+    for m in min_module:
+        print(*m)
 
     width, height = 4 * module_count, 4 * module_count
     image = Image.new('1', (32 + width, 32 + height))
@@ -459,10 +490,9 @@ def make_qrcode(data, ecc_level, version):
 
     for i in range(module_count):
         for j in range(module_count):
-            if min_module[i][j] == 1:
-                for p_i in range(i * 4 + 16, i * 4 + 20):
-                    for p_j in range(j * 4 + 16, j * 4 + 20):
-                        pixels[p_i, p_j] = 0
+            for p_i in range(i * 4 + 16, i * 4 + 20):
+                for p_j in range(j * 4 + 16, j * 4 + 20):
+                    pixels[p_j, p_i] = 1 - min_module[i][j]
     return image
 
 
@@ -703,7 +733,7 @@ if __name__ == '__main__':
         '001': lambda i, j: i % 2 == 0,
         '010': lambda i, j: j % 3 == 0,
         '011': lambda i, j: (i + j) % 3 == 0,
-        '100': lambda i, j: (math.floor(i / 2) + math.floor(j / 3)) % 2 == 0,
+        '100': lambda i, j: (i // 2 + j // 3) % 2 == 0,
         '101': lambda i, j: (i * j) % 2 + (i * j) % 3 == 0,
         '110': lambda i, j: ((i * j) % 2 + (i * j) % 3) % 2 == 0,
         '111': lambda i, j: ((i * j) % 3 + (i + j) % 2) % 2 == 0,
