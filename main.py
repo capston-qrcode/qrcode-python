@@ -334,37 +334,47 @@ def add_data_with_mask(modules, module_count, mask_func, data):
             pixels[i, j] = 255
 
     alpha = [55, 80, 105, 130, 155, 180, 205, 230]
-    for idx, block in enumerate(data):
-        bit_idx = 0
-        while bit_idx <= 7:
-            if modules[y][x] == 2:
-                for p_i in range(x * 4 + 16, x * 4 + 20):
-                    for p_j in range(y * 4 + 16, y * 4 + 20):
-                        pixels[p_i, p_j] = alpha[bit_idx]
 
-                target_bit = int(block[bit_idx])
-                if mask_func(y, x):
-                    target_bit ^= 1
-                modules[y][x] = target_bit
-                # modules[y][x] = alpha
-                bit_idx += 1
-            if (x % 2 == 0) ^ (x <= 6):
-                x -= 1
-            else:
-                x += 1
-                y += direction_y
-                if y < 0:
-                    direction_y = 1
-                    y = 0
-                    x -= 2
-                elif y >= module_count:
-                    direction_y = -1
-                    y = module_count - 1
-                    x -= 2
-            if x == 6:
-                x -= 1
+    bit_idx = 0
+    byte_idx = 0
+    while True:
+        if modules[y][x] == 2:
+            for p_i in range(x * 4 + 16, x * 4 + 20):
+                for p_j in range(y * 4 + 16, y * 4 + 20):
+                    pixels[p_i, p_j] = alpha[bit_idx]
 
-        # image.save(f'./image/qr_blocks_{idx}.png')
+            target_bit = 0
+            if byte_idx < len(data):
+                target_bit = int(data[byte_idx][bit_idx])
+
+            if mask_func(y, x):
+                target_bit ^= 1
+            modules[y][x] = target_bit
+            # modules[y][x] = alpha
+            bit_idx += 1
+            if bit_idx == 8:
+                bit_idx = 0
+                byte_idx += 1
+
+        if x == 0 and y == module_count - 9:
+            break
+
+        if (x % 2 == 0) ^ (x <= 6):
+            x -= 1
+        else:
+            x += 1
+            y += direction_y
+            if y < 0:
+                direction_y = 1
+                y = 0
+                x -= 2
+            elif y >= module_count:
+                direction_y = -1
+                y = module_count - 1
+                x -= 2
+        if x == 6:
+            x -= 1
+
     image.save(f'./image/qr_blocks.png')
     return modules
 
