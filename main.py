@@ -31,7 +31,7 @@ def get_version(data_length, mode, ecc_level):
             b_length = 4 + get_char_count_indicator_length(version, mode) + 11 * (data_length // 2) + 6 * (data_length % 2)
             if b_length <= capacity:
                 return version
-        elif mode == 'Byte':
+        elif mode == 'Byte': # utf-8
             b_length = 16 + get_char_count_indicator_length(version, mode) + 8 * data_length
             if b_length <= capacity:
                 return version
@@ -83,6 +83,13 @@ def add_terminator_and_pad(encoded_data, total_bits):
 def encode_data(data, ecc_level='M'):
     mode = determine_mode(data)
 
+    data_length = len(data)
+    if mode == 'Byte':
+        data = data.encode('utf-8')
+        data_length = len(data)
+        print('byte utf-8', data)
+        print('byte utf- len', len(data))
+
     mode_indicators = {
         'Numeric': '0001',
         'Alphanumeric': '0010',
@@ -90,8 +97,6 @@ def encode_data(data, ecc_level='M'):
     }
 
     encoded_data = mode_indicators[mode]
-
-    data_length = len(data)
 
     version = get_version(data_length, mode, ecc_level)
     if version is None:
@@ -117,11 +122,11 @@ def encode_data(data, ecc_level='M'):
             else:
                 value = alphanumeric_chars.index(data[i])
                 encoded_data += format(value, '06b')
-    elif mode == 'Byte':
-        encoded_data = '011100011010' + encoded_data
+    elif mode == 'Byte':  # utf-8
+        # encoded_data = '011100011010' + encoded_data
+        # encoded_data += '0000'
         for char in data:
-            for byte in char.encode('utf-8'):
-                encoded_data += format(byte, '08b')
+            encoded_data += format(char, '08b')
 
     encoded_data = add_terminator_and_pad(encoded_data, qr_capacity[ecc_level][version - 1])
 
@@ -217,10 +222,12 @@ def make_data_with_reed_solomon(encoded_data, error_blocks):
         for d in data_code:
             if i < len(d):
                 data_block.append(d[i])
+    print([int(d, 2) for d in data_block])
     for i in range(max_error_data_length):
         for d in error_code:
             if i < len(d):
                 data_block.append(d[i])
+    print([int(d, 2) for d in data_block])
     for _ in range(additional_blocks):
         data_block.append('00000000')
 
@@ -312,12 +319,12 @@ def add_version_information(modules, module_count, version):
     version_bits = format(version, '06b')
     version_bits += bch_encode(version, 18, 6, [1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 1, 0, 1])
     print('버전 비트:', version_bits)
-    bits_idx = 0
+    bits_idx = 17
     for i in range(0, 6):
         for j in range(module_count - 11, module_count - 8):
             modules[j][i] = int(version_bits[bits_idx])
             modules[i][j] = int(version_bits[bits_idx])
-            bits_idx += 1
+            bits_idx -= 1
 
 def add_data_with_mask(modules, module_count, mask_func, data):
     print('map data:', [int(i, 2) for i in data])
@@ -768,7 +775,7 @@ if __name__ == '__main__':
     exp, log = init_galois_field()
 
     test_data = [
-        ('안녕하세요.dsjlkl_ndjks7&&83', 'M'),
+        ('안녕하세요', 'M'),
         ('https://qrfy.com/?utm_source=Google&utm_medium=CPC&utm_campaign=17680026409&utm_term=qr%20code%20maker&gad_source=1&gclid=Cj0KCQjwkdO0BhDxARIsANkNcrfErfu3V0ztbOAN2_YjxlhdNhLMmjzDfHouAZIx5kZNfoDHi9wHCYoaAmDlEALw_wcB', 'M'),
         ('010-0000-0000', 'M'),
         ('AC-42', 'H'),
