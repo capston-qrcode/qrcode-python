@@ -1,3 +1,7 @@
+'''
+Reed-Solomon 알고리즘 made by ChatGPT
+'''
+
 def init_galois_field():
     exp = [0] * 512  # 지수 테이블
     log = [0] * 256  # 로그 테이블

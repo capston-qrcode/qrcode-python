@@ -1,3 +1,7 @@
+'''
+BCH 알고리즘 made by ChatGPT
+'''
+
 def gf_mult(x, y, prim=0b1011, field_charac_full=1 << 4):
     r = 0
     while y:
